@@ -2,7 +2,6 @@
 #include <cassert>
 #include <iostream>
 #include <string>
-#include <map>
 #include "my_map.h"
 using std::cout;
 using std::endl;
@@ -13,13 +12,14 @@ using std::endl;
 #include "dump.h"
 #include "my_file_lib.h"
 
-const int MAX_COMMAND_NAME_SIZE = 10;
+const int MAX_COMMAND_NAME_SIZE = 40;
 const int MAX_REG_NAME_SIZE = 5;
 const int MAX_NUMBER_SIZE = 10;
 
 const char VERSION[4] = "2.1";
 
 bool second_assembling = false;
+bool second_assembling_going = false;
 
 /*!
  *
@@ -62,7 +62,11 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data);
 int main(int argc, char *argv[]) {
 #include "instructions_iniz.h"
 
-    cout << argv[1] << endl;
+//    w(instructs["push"]);
+//
+//    return 0;
+
+//    cout << argv[1] << endl;
 
     char name_of_instr_file [FILENAME_MAX + 1] = {};
     char name_of_input_file [FILENAME_MAX + 1] = {};
@@ -75,12 +79,6 @@ int main(int argc, char *argv[]) {
     }
 
 
-//    int code = get_arg(argc, argv, name_of_instr_file, name_of_input_file, name_of_output_file);
-//    if (code + 1)
-//        return code;
-
-//    cout << "-----\n" << name_of_instr_file << "\n" << name_of_input_file << "\n" << name_of_output_file << "\n";
-
     char* buffer = nullptr;
     size_t buffer_size = get_buffer(name_of_input_file, &buffer);
     if (buffer == nullptr) {
@@ -88,17 +86,26 @@ int main(int argc, char *argv[]) {
         return 3;
     }
 
+    printf("\nGo ASM\n");
+
+    std::clock_t timer = std::clock();
+
     char* data = nullptr;
     size_t data_size = assembling(buffer, buffer_size, &data);
 
-    if (second_assembling)
+    if (second_assembling) {
+        secure_free(&data);
+        second_assembling_going = true;
         assembling(buffer, buffer_size, &data);
+    }
 
     secure_free(&buffer);
 
     put_data_in_file(name_of_output_file, data, data_size);
 
-    printf("\nasm is OK\n");
+    printf("\nRunning time: %lf sec.\n", (double)(std::clock() - timer) / CLOCKS_PER_SEC);
+
+    printf("asm is OK\n");
 
     return 0;
 }
@@ -168,7 +175,7 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data) {
     for (;buffer_beg < buffer_end; ++buffer_beg) {
         if (*buffer_beg == '\n' || *buffer_beg == '\t' || *buffer_beg == ' ')
             continue;
-        sscanf(buffer_beg, "%[a-z]%n", name_of_command, &n);
+        sscanf(buffer_beg, "%[a-z_0-9<>=!]%n", name_of_command, &n);
         buffer_beg += n;
 
         if (*buffer_beg == ':') {
@@ -176,26 +183,55 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data) {
             continue;
         }
 
+        if (instructs[name_of_command] == 0) {
+            printf("%s\n", name_of_command);
+            dump(DUMP_INFO, "Unknown command!");
+            assert(ERROR);
+        }
+
         *data = (char)instructs[name_of_command];
 
         if (*data == 1) {
             sscanf(buffer_beg, "%d%n", &x, &n);
+            buffer_beg += n;
+            *((int *) (data + sizeof(char))) = x * 100;
+            data += sizeof(int);
+        }
+
+        if (*data == 15 || *data == 16) {
+            sscanf(buffer_beg, " [%d]%n", &x, &n);
             buffer_beg += n;
             *((int*)(data + sizeof(char))) = x;
             data += sizeof(int);
         }
 
         if (*data == 10 || *data == 11) {
-            sscanf(buffer_beg + 1, "%[a-z]%n", name_of_register, &n);
+            sscanf(buffer_beg + 1, "%[a-z0-9]%n", name_of_register, &n);
             buffer_beg += n + 1;
             data += sizeof(char);
+            if (find_registers[name_of_register] == 0) {
+                printf("Failed name of register!\n");
+                assert(ERROR);
+            }
             *data = (char)find_registers[name_of_register];
         }
 
+        if (*data == 20) {
+            sscanf(buffer_beg, "%d%n", &x, &n);
+            buffer_beg += n;
+            *((int*)(data + sizeof(char))) = x;
+            data += sizeof(int);
+        }
+
         if (49 <= *data && *data <= 56) {
-            sscanf(buffer_beg + 1, "%[a-z]%n", name_of_label, &n);
+            sscanf(buffer_beg + 1, "%[a-z_0-9<>=!]%n", name_of_label, &n);
             buffer_beg += n + 1;
             if (labels[name_of_label] == 0) {
+                if (second_assembling_going) {
+                    printf("Name of failed label: %s\n", name_of_label);
+                    printf("Faild labels!\n");
+//                    assert(ERROR);
+                }
                 second_assembling = true;
             } else {
                 *((int*)(data + sizeof(char))) = labels[name_of_label];

@@ -1,9 +1,7 @@
 #include <cstdio>
 #include <cassert>
 #include <iostream>
-//#include <string>
 #include <cmath>
-#include "my_map.h"
 #include "ctime"
 
 using std::cout;
@@ -22,7 +20,26 @@ using std::min;
 const char VERSION[4] = "2.1";
 
 //registers
-int registers[10] = {};
+int registers[15] = {};
+char image_[MAX_IMAGE_HEIGHT][MAX_IMAGE_WIDTH] = {};
+int RAM_[MAX_RAM_SIZE] = {};
+
+/*!
+ * puts in VideoRAM circle [2*r + 1, 2*r + 1]
+ *
+ * @param[in] r radius if circle
+ */
+
+void make_circle(int r);
+
+/*!
+ * Prints image [n, m]
+ *
+ * @param[in] n height of image
+ * @param[in] m width of image
+ */
+
+void print_image(int n, int m);
 
 /*!
  * main function of CPU
@@ -33,7 +50,6 @@ int registers[10] = {};
  */
 
 int processing(char* code, size_t code_size);
-
 
 
 int main(int argc, char *argv[]) {
@@ -59,7 +75,6 @@ int processing(char* code, size_t code_size) {
     }
 
     char* code_to_free = code;
-    char* code_begin = code + sizeof(Signature);
 
     ((Signature*)code)->dump();
 
@@ -94,8 +109,45 @@ int processing(char* code, size_t code_size) {
 
     secure_free(&code_to_free);
 
-    printf("Runing time: %f\n", (double)(std::clock() - timer) / CLOCKS_PER_SEC);
-    printf("\nCPU is OK\n\n");
+    printf("\nRunning time: %lf sec.\n", (double)(std::clock() - timer) / CLOCKS_PER_SEC);
+    printf("CPU is OK\n\n");
 
     return 0;
+}
+
+void make_circle(int r) {
+    assert(0 < r && 2 * r <= MAX_IMAGE_HEIGHT);
+    for (int i = 0; i <= r; i++) {
+        for (int j = 0; j <= r; j++) {
+            if (pow(r - i, 2) + pow(r - j, 2) <= pow(r, 2))
+                image_[i][j] = CYAN;
+            else
+                image_[i][j] = RED;
+        }
+    }
+
+    for (int i = r; i <= 2 * r; i++) {
+        for (int j = 0; j <= r; j++) {
+            image_[i][j] = image_[2 * r - i][j];
+        }
+    }
+    for (int i = 0; i <= 2 * r; i++) {
+        for (int j = r; j <= 2 * r; j++) {
+            image_[i][j] = image_[i][2 * r - j];
+        }
+    }
+}
+
+void print_image(int n, int m) {
+    assert(0 < n && n <= MAX_IMAGE_HEIGHT);
+    assert(0 < m && m <= MAX_IMAGE_WIDTH);
+
+    printf("\n");
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            printf("\033[%dm  \033[0m", image_[i][j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
 }
