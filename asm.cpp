@@ -62,12 +62,6 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data);
 int main(int argc, char *argv[]) {
 #include "instructions_iniz.h"
 
-//    w(instructs["push"]);
-//
-//    return 0;
-
-//    cout << argv[1] << endl;
-
     char name_of_instr_file [FILENAME_MAX + 1] = {};
     char name_of_input_file [FILENAME_MAX + 1] = {};
     char name_of_output_file[FILENAME_MAX + 1] = {};
@@ -175,8 +169,10 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data) {
     for (;buffer_beg < buffer_end; ++buffer_beg) {
         if (*buffer_beg == '\n' || *buffer_beg == '\t' || *buffer_beg == ' ')
             continue;
+
         sscanf(buffer_beg, "%[a-z_0-9<>=!]%n", name_of_command, &n);
         buffer_beg += n;
+//        w(name_of_command);
 
         if (*buffer_beg == ':') {
             labels[name_of_command] = data - *r_data;
@@ -184,8 +180,8 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data) {
         }
 
         if (instructs[name_of_command] == 0) {
-            printf("%s\n", name_of_command);
             dump(DUMP_INFO, "Unknown command!");
+            printf("%s\n", name_of_command);
             assert(ERROR);
         }
 
@@ -198,19 +194,52 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data) {
             data += sizeof(int);
         }
 
-        if (*data == 15 || *data == 16) {
-            sscanf(buffer_beg, " [%d]%n", &x, &n);
+        if (*data == 15 || *data == 16 || *data == 17 || *data == 18) {
+
+            x = -1;
+            *name_of_register = '\0';
+
+            sscanf(buffer_beg, " [%[a-z] + %d]%n", name_of_register, &x, &n);
+            if (x == -1 || *name_of_register == '\0') {
+                sscanf(buffer_beg, " [%d + %[a-z]]%n", &x, name_of_register, &n);
+                if (x == -1 || *name_of_register == '\0') {
+                    sscanf(buffer_beg, " [%d]%n", &x, &n);
+                    if (x == -1) {
+                        sscanf(buffer_beg, " [ %[a-z]]%n", name_of_register, &n);
+                        if (*name_of_register == '\0') {
+                            dump(DUMP_INFO, "Failed _RAM inctructions!");
+                            assert(ERROR);
+                        }
+                    }
+                }
+            }
+
+            if (*name_of_register != '\0' && find_registers[name_of_register] == 0) {
+                dump(DUMP_INFO, "Failed name of register!");
+                assert(ERROR);
+            }
+
             buffer_beg += n;
+            data += sizeof(char);
+            *data = (char)find_registers[name_of_register];
+
             *((int*)(data + sizeof(char))) = x;
             data += sizeof(int);
         }
 
-        if (*data == 10 || *data == 11) {
-            sscanf(buffer_beg + 1, "%[a-z0-9]%n", name_of_register, &n);
+//        if (*data == 17 || *data == 18) {
+//            sscanf(buffer_beg, " [%d]%n", &x, &n);
+//            buffer_beg += n;
+//            *((int*)(data + sizeof(char))) = x;
+//            data += sizeof(int);
+//        }
+
+        if (*data == 10 || *data == 11 || *data == 21) {
+            sscanf(buffer_beg + 1, " %[a-z0-9]%n", name_of_register, &n);
             buffer_beg += n + 1;
             data += sizeof(char);
             if (find_registers[name_of_register] == 0) {
-                printf("Failed name of register!\n");
+                dump(DUMP_INFO, "Failed name of register!");
                 assert(ERROR);
             }
             *data = (char)find_registers[name_of_register];
@@ -228,9 +257,9 @@ size_t assembling(char* buffer, size_t buffer_size, char* *r_data) {
             buffer_beg += n + 1;
             if (labels[name_of_label] == 0) {
                 if (second_assembling_going) {
+                    dump(DUMP_INFO, "Faild labels!");
                     printf("Name of failed label: %s\n", name_of_label);
-                    printf("Faild labels!\n");
-//                    assert(ERROR);
+                    assert(ERROR);
                 }
                 second_assembling = true;
             } else {

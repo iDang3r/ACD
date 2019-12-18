@@ -23,6 +23,7 @@ const char VERSION[4] = "2.1";
 int registers[15] = {};
 char image_[MAX_IMAGE_HEIGHT][MAX_IMAGE_WIDTH] = {};
 int RAM_[MAX_RAM_SIZE] = {};
+char VRAM_[MAX_VRAM_SIZE] = {};
 
 /*!
  * puts in VideoRAM circle [2*r + 1, 2*r + 1]
@@ -88,6 +89,8 @@ int processing(char* code, size_t code_size) {
     Stack(St);
     Stack(Func_calls);
 
+    printf("\033[1;32mProgram begin\033[0m\n");
+
     std::clock_t timer = std::clock();
 
 #define DEF_CMD(name, num, next, cpu_code, disasm_code) \
@@ -98,6 +101,8 @@ int processing(char* code, size_t code_size) {
 //        Func_calls.dump(DUMP_INFO);
         switch (*code) {
 
+            // AUTO_GENERATED SWITCH
+
             #include "commands.h"
 
             default:
@@ -106,6 +111,8 @@ int processing(char* code, size_t code_size) {
         }
     }
 #undef DEF_CMD
+
+    printf("\033[1;32mProgram end\033[0m\n");
 
     secure_free(&code_to_free);
 
